@@ -1,61 +1,36 @@
-import { DemoResponse } from "@shared/api";
-import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 export default function Index() {
-  const [exampleFromServer, setExampleFromServer] = useState("");
-  // Fetch users on component mount
-  useEffect(() => {
-    fetchDemo();
-  }, []);
+  const navigate = useNavigate();
 
-  // Example of how to fetch data from the server (if needed)
-  const fetchDemo = async () => {
-    try {
-      const response = await fetch("/api/demo");
-      const data = (await response.json()) as DemoResponse;
-      setExampleFromServer(data.message);
-    } catch (error) {
-      console.error("Error fetching hello:", error);
-    }
+  const handleStartChat = () => {
+    navigate("/chat");
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200">
-      <div className="text-center">
-        {/* TODO: FUSION_GENERATION_APP_PLACEHOLDER replace everything here with the actual app! */}
-        <h1 className="text-2xl font-semibold text-slate-800 flex items-center justify-center gap-3">
-          <svg
-            className="animate-spin h-8 w-8 text-slate-400"
-            viewBox="0 0 50 50"
-          >
-            <circle
-              className="opacity-30"
-              cx="25"
-              cy="25"
-              r="20"
-              stroke="currentColor"
-              strokeWidth="5"
-              fill="none"
-            />
-            <circle
-              className="text-slate-600"
-              cx="25"
-              cy="25"
-              r="20"
-              stroke="currentColor"
-              strokeWidth="5"
-              fill="none"
-              strokeDasharray="100"
-              strokeDashoffset="75"
-            />
-          </svg>
-          Generating your app...
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 sm:px-6">
+      <div className="text-center max-w-md">
+        <h1 className="text-4xl sm:text-5xl font-bold text-foreground mb-4">
+          Meet Strangers
         </h1>
-        <p className="mt-4 text-slate-600 max-w-md">
-          Watch the chat on the left for updates that might need your attention
-          to finish generating
+        <p className="text-lg text-muted-foreground mb-8">
+          Connect anonymously with someone new. Break the ice with AI-powered conversation starters.
         </p>
-        <p className="mt-4 hidden max-w-md">{exampleFromServer}</p>
+
+        <Button
+          onClick={handleStartChat}
+          size="lg"
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6"
+        >
+          START CHAT
+        </Button>
+
+        <div className="mt-12 pt-12 border-t border-border text-sm text-muted-foreground space-y-3">
+          <div>✓ Completely Anonymous</div>
+          <div>✓ AI Icebreakers</div>
+          <div>✓ Real-time Chat</div>
+        </div>
       </div>
     </div>
   );
