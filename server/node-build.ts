@@ -11,20 +11,29 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.join(__dirname, "../spa");
 
-// Serve static files
-app.use(express.static(distPath));
+// Serve static files with fallback options
+app.use(express.static(distPath, { 
+  fallthrough: true,  // Allow requests to continue if file not found
+  index: false  // Don't serve index.html automatically
+}));
 
-// Handle React Router - serve index.html for all non-API routes
-app.get("*", (req, res) => {
-  // Don't serve index.html for API routes
+// Handle React Router - serve index.html for all non-API and non-static routes
+app.use((req, res, next) => {
+  // Skip for API routes and socket.io
   if (
     req.path.startsWith("/api/") ||
     req.path.startsWith("/health") ||
     req.path.startsWith("/socket.io/")
   ) {
-    return res.status(404).json({ error: "API endpoint not found" });
+    return next();
   }
 
+  // Skip for static assets (files with extensions)
+  if (path.extname(req.path)) {
+    return next();
+  }
+
+  // Serve index.html for all other routes (React Router)
   res.sendFile(path.join(distPath, "index.html"));
 });
 

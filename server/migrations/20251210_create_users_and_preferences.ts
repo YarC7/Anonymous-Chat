@@ -23,6 +23,7 @@ export async function up(knex: Knex): Promise<void> {
       .onDelete("CASCADE");
     table.enum("gender", ["male", "female", "other", "prefer-not-to-say"]);
     table.enum("chat_style", ["friendly", "casual", "professional", "fun"]);
+    table.string("match_gender", 10).defaultTo("random");
     table.json("interests");
     table.timestamps(true, true);
 

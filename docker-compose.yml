@@ -42,6 +42,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
     container_name: anonymous-chat-app
     restart: unless-stopped
     ports:
@@ -57,6 +59,7 @@ services:
       DB_PASSWORD: ${DATABASE_PASSWORD:-postgres}
       # Redis config
       REDIS_HOST: redis
+      VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       REDIS_PORT: 6379
       # API keys
       GROQ_API_KEY: ${GROQ_API_KEY}

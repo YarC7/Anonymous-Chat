@@ -12,6 +12,10 @@ RUN npm install -g pnpm && pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
+# Build arguments for Vite
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+
 # Build the application
 RUN pnpm build
 
@@ -36,13 +40,13 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server/knexfile.ts ./server/knexfile.ts
 COPY --from=builder /app/server/migrations ./server/migrations
 
-# Install tsx for running TypeScript migration files
-RUN pnpm add -g tsx
+# Install tsx locally for running TypeScript migration files
+RUN pnpm add tsx
 
 # Create entrypoint script
 RUN echo '#!/bin/sh' > /entrypoint.sh && \
     echo 'echo "Running database migrations..."' >> /entrypoint.sh && \
-    echo 'tsx node_modules/knex/bin/cli.js migrate:latest --knexfile server/knexfile.ts' >> /entrypoint.sh && \
+    echo 'npx tsx node_modules/knex/bin/cli.js migrate:latest --knexfile server/knexfile.ts' >> /entrypoint.sh && \
     echo 'echo "Starting server..."' >> /entrypoint.sh && \
     echo 'exec node dist/server/node-build.mjs' >> /entrypoint.sh && \
     chmod +x /entrypoint.sh
