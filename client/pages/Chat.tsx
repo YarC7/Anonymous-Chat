@@ -1,142 +1,230 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { io, Socket } from "socket.io-client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Plus } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowRight, Loader2, Send } from "lucide-react";
+import { Card } from "@/components/ui/card";
 
 interface Message {
   id: string;
-  text: string;
-  isUser: boolean;
+  senderId: string;
+  message: string;
   timestamp: number;
 }
 
-const ICEBREAKER_SUGGESTIONS = [
-  "Do you believe in ghosts?",
-  "What's your favorite movie?",
-  "If you could travel anywhere, where would it be?",
-  "What's your hidden talent?",
-  "Do you prefer coffee or tea?",
-  "What's the best advice you've received?",
-];
-
 export default function Chat() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [socket, setSocket] = useState<Socket | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isSearching, setIsSearching] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [icebreakers, setIcebreakers] = useState<string[]>([]);
+  const [strangerTyping, setStrangerTyping] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
+  // Initialize Socket.io connection
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsSearching(false);
-      const shuffled = ICEBREAKER_SUGGESTIONS.sort(() => Math.random() - 0.5);
-      setIcebreakers(shuffled.slice(0, 3));
-      
-      setMessages([
-        {
-          id: "1",
-          text: "Hey there! 👋",
-          isUser: false,
-          timestamp: Date.now(),
-        },
-      ]);
-    }, 2000);
+    if (!user) {
+      navigate("/");
+      return;
+    }
 
-    return () => clearTimeout(timer);
-  }, []);
+    const socketUrl = import.meta.env.DEV
+      ? "http://localhost:8080"
+      : window.location.origin;
+    const newSocket = io(socketUrl, {
+      withCredentials: true,
+    });
 
+    newSocket.on("connect", () => {
+      console.log("Socket connected:", newSocket.id);
+      setIsConnected(true);
+      setSocket(newSocket);
+
+      // Join queue immediately
+      newSocket.emit("join_queue", { userId: user.id });
+    });
+
+    newSocket.on("disconnect", () => {
+      console.log("Socket disconnected");
+      setIsConnected(false);
+    });
+
+    newSocket.on("searching", (data: { queuePosition: number }) => {
+      console.log("Still searching, queue position:", data.queuePosition);
+    });
+
+    newSocket.on(
+      "match_found",
+      (data: { sessionId: string; icebreakers: string[] }) => {
+        console.log("Match found!", data);
+        setIsSearching(false);
+        setSessionId(data.sessionId);
+        setIcebreakers(data.icebreakers || []);
+
+        // Join the session room
+        newSocket.emit("join_session", { sessionId: data.sessionId });
+      },
+    );
+
+    newSocket.on("new_message", (messageData: Message) => {
+      console.log("New message:", messageData);
+      setMessages((prev) => [...prev, messageData]);
+    });
+
+    newSocket.on("stranger_typing", (data: { isTyping: boolean }) => {
+      setStrangerTyping(data.isTyping);
+    });
+
+    newSocket.on("stranger_left", () => {
+      alert("Stranger left the chat. Finding you a new match...");
+      // Reset state
+      setMessages([]);
+      setSessionId(null);
+      setIcebreakers([]);
+      setIsSearching(true);
+
+      // Rejoin queue
+      newSocket.emit("join_queue", { userId: user.id });
+    });
+
+    newSocket.on("stranger_disconnected", () => {
+      alert("Stranger disconnected. Finding you a new match...");
+      setMessages([]);
+      setSessionId(null);
+      setIcebreakers([]);
+      setIsSearching(true);
+
+      newSocket.emit("join_queue", { userId: user.id });
+    });
+
+    newSocket.on("error", (data: { message: string }) => {
+      console.error("Socket error:", data.message);
+      alert(data.message);
+    });
+
+    return () => {
+      newSocket.disconnect();
+    };
+  }, [user, navigate]);
+
+  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSendMessage = (text: string) => {
-    if (!text.trim()) return;
+  const handleSend = (messageText?: string) => {
+    const text = messageText || inputValue.trim();
+    if (!text || !socket || !sessionId) return;
 
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: text.trim(),
-      isUser: true,
-      timestamp: Date.now(),
-    };
+    socket.emit("send_message", {
+      sessionId,
+      message: text,
+    });
 
-    setMessages((prev) => [...prev, newMessage]);
     setInputValue("");
-
-    setTimeout(() => {
-      const randomResponse = [
-        "That's interesting! Tell me more...",
-        "I totally agree with you 😄",
-        "Wow, never thought about it that way",
-        "Haha, that's cool! Do you do that often?",
-      ];
-      const response: Message = {
-        id: Date.now().toString(),
-        text: randomResponse[Math.floor(Math.random() * randomResponse.length)],
-        isUser: false,
-        timestamp: Date.now(),
-      };
-      setMessages((prev) => [...prev, response]);
-    }, 500);
+    setIsTyping(false);
   };
 
-  const handleIcebreakerClick = (suggestion: string) => {
-    handleSendMessage(suggestion);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputValue(value);
+
+    if (!socket || !sessionId) return;
+
+    // Send typing indicator
+    if (!isTyping && value.length > 0) {
+      setIsTyping(true);
+      socket.emit("typing", { sessionId, isTyping: true });
+    }
+
+    // Clear previous timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Stop typing after 1 second of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      socket.emit("typing", { sessionId, isTyping: false });
+    }, 1000);
   };
 
-  const handleNext = () => {
+  const handleSkip = () => {
+    if (!socket) return;
+
+    socket.emit("leave_session");
     setMessages([]);
-    setInputValue("");
-    setIsSearching(true);
+    setSessionId(null);
     setIcebreakers([]);
+    setIsSearching(true);
 
-    const timer = setTimeout(() => {
-      setIsSearching(false);
-      const shuffled = ICEBREAKER_SUGGESTIONS.sort(() => Math.random() - 0.5);
-      setIcebreakers(shuffled.slice(0, 3));
-      
-      setMessages([
-        {
-          id: "1",
-          text: "Hello! How's it going? 😊",
-          isUser: false,
-          timestamp: Date.now(),
-        },
-      ]);
-    }, 2000);
-
-    return () => clearTimeout(timer);
+    // Find new match
+    if (user) {
+      socket.emit("join_queue", { userId: user.id });
+    }
   };
 
-  const handleGoHome = () => {
-    navigate("/");
-  };
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <Card className="p-8 text-center">
+          <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-600" />
+          <p className="text-lg font-medium">Connecting to server...</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isSearching) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <Card className="p-8 text-center max-w-md">
+          <Loader2 className="w-16 h-16 animate-spin mx-auto mb-4 text-blue-600" />
+          <h2 className="text-2xl font-bold mb-2">Finding you a match...</h2>
+          <p className="text-gray-600">
+            Looking for someone interesting to chat with 🔍
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="border-b border-border px-4 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-foreground">Anonymous Chat</h1>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleGoHome}
-          className="text-muted-foreground hover:text-foreground"
-        >
+        <div>
+          <h1 className="text-lg font-semibold text-foreground">
+            Anonymous Chat
+          </h1>
+          <p className="text-xs text-muted-foreground">
+            Connected with stranger • {messages.length} messages
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => navigate("/")}>
           Exit
         </Button>
       </div>
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 min-h-0">
-        {isSearching ? (
+        {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
-              <div className="inline-block mb-4">
-                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-              </div>
-              <p className="text-lg text-foreground font-medium">Searching for a match...</p>
-              <p className="text-sm text-muted-foreground mt-2">Finding someone awesome for you</p>
+              <p className="text-lg text-foreground font-medium">
+                Match found! 🎉
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Say hi or use an icebreaker below
+              </p>
             </div>
           </div>
         ) : (
@@ -144,81 +232,83 @@ export default function Chat() {
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex ${message.isUser ? "justify-end" : "justify-start"}`}
+                className={`flex ${message.senderId === user?.id ? "justify-end" : "justify-start"}`}
               >
                 <div
                   className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl break-words ${
-                    message.isUser
+                    message.senderId === user?.id
                       ? "bg-primary text-primary-foreground rounded-br-none"
                       : "bg-card text-card-foreground rounded-bl-none border border-border"
                   }`}
                 >
-                  <p className="text-sm sm:text-base">{message.text}</p>
+                  <p className="text-sm sm:text-base">{message.message}</p>
                 </div>
               </div>
             ))}
+            {strangerTyping && (
+              <div className="flex justify-start">
+                <div className="max-w-xs lg:max-w-md px-4 py-3 rounded-2xl bg-card border border-border">
+                  <p className="text-sm text-muted-foreground italic">
+                    Stranger is typing...
+                  </p>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </>
         )}
       </div>
 
-      {/* Icebreaker Chips */}
-      {!isSearching && icebreakers.length > 0 && (
+      {/* Icebreaker Pills */}
+      {icebreakers.length > 0 && (
         <div className="px-4 py-4 border-t border-border space-y-2 bg-card/50">
           <p className="text-xs font-medium text-muted-foreground mb-3">
-            Don't know what to say? Try these:
+            💡 AI-powered conversation starters:
           </p>
-          <div className="grid grid-cols-1 gap-2">
+          <div className="flex flex-wrap gap-2">
             {icebreakers.map((suggestion, index) => (
-              <button
+              <Button
                 key={index}
-                onClick={() => handleIcebreakerClick(suggestion)}
-                className="text-left p-3 rounded-lg bg-background hover:bg-background/80 border border-primary/30 hover:border-primary transition-colors text-sm text-foreground hover:text-primary group"
+                onClick={() => handleSend(suggestion)}
+                variant="outline"
+                size="sm"
+                className="text-sm hover:bg-primary hover:text-primary-foreground"
               >
-                <span className="flex items-start gap-2">
-                  <Plus className="w-4 h-4 flex-shrink-0 mt-0.5 text-primary/50 group-hover:text-primary" />
-                  <span className="flex-1">{suggestion}</span>
-                </span>
-              </button>
+                {suggestion}
+              </Button>
             ))}
           </div>
         </div>
       )}
 
       {/* Input Area */}
-      {!isSearching && (
-        <div className="border-t border-border px-4 py-4 bg-card/50 space-y-3">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === "Enter") {
-                  handleSendMessage(inputValue);
-                }
-              }}
-              placeholder="Type your message..."
-              className="flex-1 bg-background border border-border rounded-full px-4 py-3 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-            />
-            <Button
-              onClick={() => handleSendMessage(inputValue)}
-              size="icon"
-              className="rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex-shrink-0"
-            >
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-          </div>
+      <div className="border-t border-border px-4 py-4 bg-card/50">
+        <div className="flex gap-2 mb-3">
+          <Input
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyPress={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder="Type your message..."
+            className="flex-1"
+          />
           <Button
-            onClick={handleNext}
-            variant="outline"
-            className="w-full text-foreground border-border hover:bg-background/50"
+            onClick={() => handleSend()}
+            disabled={!inputValue.trim()}
+            size="icon"
           >
-            <ArrowRight className="w-4 h-4 mr-2" />
-            Next Person
+            <Send className="w-4 h-4" />
           </Button>
         </div>
-      )}
+        <Button onClick={handleSkip} variant="outline" className="w-full">
+          Skip & Find New Match
+        </Button>
+      </div>
     </div>
   );
 }
