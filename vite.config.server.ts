@@ -10,7 +10,7 @@ export default defineConfig({
     lib: {
       entry: path.resolve(__dirname, "server/node-build.ts"),
       name: "server",
-      fileName: "production",
+      fileName: "node-build",
       formats: ["es"],
     },
     outDir: "dist/server",
@@ -35,6 +35,13 @@ export default defineConfig({
         // External dependencies that should not be bundled
         "express",
         "cors",
+        "socket.io",
+        "knex",
+        "pg",
+        "ioredis",
+        "dotenv",
+        "groq-sdk",
+        "cookie-parser",
       ],
       output: {
         format: "es",

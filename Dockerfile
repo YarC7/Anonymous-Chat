@@ -31,11 +31,9 @@ RUN pnpm install --prod --frozen-lockfile
 
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/server ./server
-COPY --from=builder /app/shared ./shared
 
 # Expose port
 EXPOSE 8080
 
 # Start the application
-CMD ["node", "dist/server/index.js"]
+CMD ["node", "dist/server/node-build.mjs"]
