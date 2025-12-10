@@ -1,6 +1,6 @@
-import db from "../db";
+import { getDb } from "../db";
 
-async function addMatchGenderColumn() {
+const db = getDb();
   try {
     // Add match_gender column to user_preferences table
     await db.schema.alterTable("user_preferences", (table) => {

@@ -2,7 +2,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { Server as HTTPServer } from "http";
 import crypto from "crypto";
 import { matchingQueue, QueueUser } from "./matchingQueue";
-import db from "./db";
+import { getDb } from "./db";
 import {
   generateIcebreakers,
   generateContextualIcebreakers,
@@ -24,7 +24,7 @@ export function setupSocketIO(httpServer: HTTPServer) {
   io.on("connection", (socket) => {
     console.log(`Socket connected: ${socket.id}`);
 
-    // Join queue and find match
+    const db = getDb();
     socket.on("join_queue", async (data: { userId: string }) => {
       try {
         const { userId } = data;

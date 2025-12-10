@@ -5,9 +5,9 @@ import {
   UpdateProfileResponse,
   UserPreferences,
 } from "@shared/auth";
-import db from "../db";
+import { getDb } from "../db";
 
-// Session expiry: 7 days
+const db = getDb();
 const SESSION_EXPIRY_DAYS = 7;
 
 // Exchange authorization code for tokens and user info

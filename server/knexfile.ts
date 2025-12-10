@@ -52,6 +52,31 @@ const config: { [key: string]: Knex.Config } = {
       directory: join(__dirname, "migrations"),
     },
   },
+
+
+  test: {
+  client: "postgresql",
+  connection: {
+    // You can pull test credentials from specific environment variables 
+    // or hardcode them if it's a known local test database.
+    host: process.env.DB_TEST_HOST || "localhost",
+    port: parseInt(process.env.DB_TEST_PORT || "5432"),
+    database: process.env.DB_TEST_NAME || "anonymous_chat_test", // 👈 Make sure this DB exists!
+    user: process.env.DB_TEST_USER || "postgres",
+    password: process.env.DB_TEST_PASSWORD || "postgres",
+  },
+  pool: {
+    min: 1, // Can be smaller than development pool
+    max: 5,
+  },
+  migrations: {
+    tableName: "knex_migrations",
+    directory: join(__dirname, "migrations"),
+  },
+  seeds: {
+    directory: join(__dirname, "seeds/test"), // Optional: separate seeds for testing
+  },
+},
 };
 
 export default config;
