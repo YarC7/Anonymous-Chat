@@ -30,18 +30,24 @@ function expressPlugin(): Plugin {
     apply: "serve", // Only apply during development (serve mode)
     configureServer(viteServer) {
       // Lazy load server to avoid DB init during config load
-      return () => {
-        const { createServer } = require("./server/index.ts");
-        const { setupSocketIO } = require("./server/socket.ts");
+      return async () => {
+        try {
+          const serverModule = await import("./server/index.js");
+          const socketModule = await import("./server/socket.js");
 
-        const { app } = createServer(false); // Don't attach Socket.io here        // Attach Socket.io to Vite's HTTP server
-        if (viteServer.httpServer) {
-          setupSocketIO(viteServer.httpServer);
-          console.log("✅ Socket.io attached to Vite dev server");
+          const { app } = serverModule.createServer(false); // Don't attach Socket.io here
+
+          // Attach Socket.io to Vite's HTTP server
+          if (viteServer.httpServer) {
+            socketModule.setupSocketIO(viteServer.httpServer as any);
+            console.log("✅ Socket.io attached to Vite dev server");
+          }
+
+          // Add Express app as middleware to Vite dev server
+          viteServer.middlewares.use(app);
+        } catch (error) {
+          console.error("Failed to load server modules:", error);
         }
-
-        // Add Express app as middleware to Vite dev server
-        viteServer.middlewares.use(app);
       };
     },
   };
