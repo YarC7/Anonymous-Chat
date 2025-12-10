@@ -98,14 +98,14 @@ Follow these instructions to get the project up and running on your local machin
 
 While `docker-compose` is the recommended way to run the entire stack, you can also use the following scripts for specific tasks.
 
--   `pnpm dev`: Starts the frontend and backend in development mode with hot-reloading. (Note: Requires separate local instances of Postgres and Redis).
--   `pnpm build`: Builds the client and server for production.
--   `pnpm test`: Runs the test suite.
--   `pnpm typecheck`: Validates TypeScript types across the project.
+- `pnpm dev`: Starts the frontend and backend in development mode with hot-reloading. (Note: Requires separate local instances of Postgres and Redis).
+- `pnpm build`: Builds the client and server for production.
+- `pnpm test`: Runs the test suite.
+- `pnpm typecheck`: Validates TypeScript types across the project.
 
 ## CI/CD
 
 This project uses GitHub Actions for Continuous Integration and Continuous Deployment. The workflow is defined in `.github/workflows/ci-cd.yml` and includes the following jobs:
 
--   **Test**: Runs the test suite against live database and Redis services within the CI environment.
--   **Build and Push**: Builds the production Docker image and pushes it to GitHub Container Registry (GHCR).
+- **Test**: Runs the test suite against live database and Redis services within the CI environment.
+- **Build and Push**: Builds the production Docker image and pushes it to GitHub Container Registry (GHCR).
