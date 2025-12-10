@@ -32,8 +32,23 @@ RUN pnpm install --prod --frozen-lockfile
 # Copy built files from builder
 COPY --from=builder /app/dist ./dist
 
+# Copy server files needed for migrations
+COPY --from=builder /app/server/knexfile.ts ./server/knexfile.ts
+COPY --from=builder /app/server/migrations ./server/migrations
+
+# Install tsx for running TypeScript migration files
+RUN pnpm add -g tsx
+
+# Create entrypoint script
+RUN echo '#!/bin/sh' > /entrypoint.sh && \
+    echo 'echo "Running database migrations..."' >> /entrypoint.sh && \
+    echo 'tsx node_modules/knex/bin/cli.js migrate:latest --knexfile server/knexfile.ts' >> /entrypoint.sh && \
+    echo 'echo "Starting server..."' >> /entrypoint.sh && \
+    echo 'exec node dist/server/node-build.mjs' >> /entrypoint.sh && \
+    chmod +x /entrypoint.sh
+
 # Expose port
 EXPOSE 8080
 
-# Start the application
-CMD ["node", "dist/server/node-build.mjs"]
+# Use entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]

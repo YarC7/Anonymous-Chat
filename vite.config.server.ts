@@ -17,32 +17,14 @@ export default defineConfig({
     target: "node22",
     ssr: true,
     rollupOptions: {
-      external: [
-        // Node.js built-ins
-        "fs",
-        "path",
-        "url",
-        "http",
-        "https",
-        "os",
-        "crypto",
-        "stream",
-        "util",
-        "events",
-        "buffer",
-        "querystring",
-        "child_process",
-        // External dependencies that should not be bundled
-        "express",
-        "cors",
-        "socket.io",
-        "knex",
-        "pg",
-        "ioredis",
-        "dotenv",
-        "groq-sdk",
-        "cookie-parser",
-      ],
+      external: (id) => {
+        // Keep local files
+        if (id.startsWith(".") || id.startsWith("/")) return false;
+        // Keep @shared alias
+        if (id.startsWith("@shared")) return false;
+        // External everything else (all npm packages)
+        return true;
+      },
       output: {
         format: "es",
         entryFileNames: "[name].mjs",
