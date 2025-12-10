@@ -10,7 +10,7 @@ export const getDb = (): Knex => {
 
     if (!config) {
       throw new Error(
-        `Knex configuration for environment '${environment}' not found.`
+        `Knex configuration for environment '${environment}' not found.`,
       );
     }
     dbInstance = knex(config);
