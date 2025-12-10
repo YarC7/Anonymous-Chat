@@ -22,7 +22,8 @@ export async function generateIcebreakers(
 
   try {
     const systemPrompt =
-      "You are a friendly conversation starter assistant. Generate engaging, fun, and appropriate icebreaker questions for strangers to start chatting. Keep them light, positive, and universally relatable.";
+      "You are a friendly conversation starter assistant. Generate engaging, fun, and appropriate icebreaker questions for strangers to start chatting. Keep them light, positive, and universally relatable.\n\n" +
+      "IMPORTANT: Output ONLY the 3 questions, nothing else. No explanations, no commentary, no thinking process. Just the questions.";
 
     const userPrompt = buildPrompt(user1Prefs, user2Prefs);
     const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
@@ -82,7 +83,12 @@ function buildPrompt(
   }
 
   prompt +=
-    "Make them interesting, positive, and easy to answer. Return only the 3 questions, numbered 1-3, one per line.";
+    "Make them interesting, positive, and easy to answer.\n\n" +
+    "OUTPUT FORMAT:\n" +
+    "1. [First question]\n" +
+    "2. [Second question]\n" +
+    "3. [Third question]\n\n" +
+    "Do not include any other text, explanations, or commentary. ONLY output the 3 numbered questions.";
 
   return prompt;
 }
@@ -131,9 +137,16 @@ export async function generateContextualIcebreakers(
       "2. Deepen the conversation naturally\n" +
       "3. Are open-ended and interesting\n" +
       "4. Match the tone and style of the existing chat\n\n" +
-      "Keep questions friendly, positive, and appropriate.";
+      "Keep questions friendly, positive, and appropriate.\n\n" +
+      "IMPORTANT: Output ONLY the 3 questions, nothing else. No explanations, no commentary, no thinking process.";
 
-    const userPrompt = `Recent conversation:\n${recentMessages}\n\nGenerate 3 follow-up questions based on this conversation. Return only the questions, numbered 1-3, one per line.`;
+    const userPrompt =
+      `Recent conversation:\n${recentMessages}\n\nGenerate 3 follow-up questions based on this conversation.\n\n` +
+      "OUTPUT FORMAT:\n" +
+      "1. [First question]\n" +
+      "2. [Second question]\n" +
+      "3. [Third question]\n\n" +
+      "Do not include any other text. ONLY output the 3 numbered questions.";
 
     const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
     const result = await groq.chat.completions.create({
