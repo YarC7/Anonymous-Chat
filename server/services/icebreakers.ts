@@ -1,5 +1,5 @@
 import Groq from "groq-sdk";
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY || "GROQ API KEY" });
 
 interface UserPreferences {
   gender?: string;
