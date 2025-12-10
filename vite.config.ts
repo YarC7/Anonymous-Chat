@@ -31,12 +31,10 @@ function expressPlugin(): Plugin {
     configureServer(viteServer) {
       // Lazy load server to avoid DB init during config load
       return () => {
-        const { createServer } = require("./server");
-        const { setupSocketIO } = require("./server/socket");
+        const { createServer } = require("./server/index.ts");
+        const { setupSocketIO } = require("./server/socket.ts");
 
-        const { app } = createServer(false); // Don't attach Socket.io here
-
-        // Attach Socket.io to Vite's HTTP server
+        const { app } = createServer(false); // Don't attach Socket.io here        // Attach Socket.io to Vite's HTTP server
         if (viteServer.httpServer) {
           setupSocketIO(viteServer.httpServer);
           console.log("✅ Socket.io attached to Vite dev server");
