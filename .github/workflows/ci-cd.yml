@@ -124,21 +124,44 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to production
-        run: |
-          echo "Add your deployment commands here"
-          echo "For example: SSH to server and run docker-compose pull && docker-compose up -d"
-        # Uncomment and configure for actual deployment:
-        # - name: Deploy via SSH
-        #   uses: appleboy/ssh-action@master
-        #   with:
-        #     host: ${{ secrets.DEPLOY_HOST }}
-        #     username: ${{ secrets.DEPLOY_USER }}
-        #     key: ${{ secrets.DEPLOY_KEY }}
-        #     script: |
-        #       cd /path/to/app
-        #       docker-compose pull
-        #       docker-compose up -d
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build for GitHub Pages
+        run: pnpm build:client
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "./dist/spa"
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
