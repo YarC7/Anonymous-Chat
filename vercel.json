@@ -1,13 +1,9 @@
 {
-    "buildCommand": "pnpm build:client",
-    "outputDirectory": "dist/spa",
+    "buildCommand": "pnpm build",
+    "outputDirectory": "dist",
     "framework": null,
     "devCommand": "pnpm dev",
     "installCommand": "pnpm install",
-    "env": {
-        "VITE_GOOGLE_CLIENT_ID": "@vite_google_client_id",
-        "VITE_API_URL": "@vite_api_url"
-    },
     "rewrites": [
         {
             "source": "/(.*)",
