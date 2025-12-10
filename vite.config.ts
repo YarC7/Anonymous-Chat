@@ -35,7 +35,7 @@ function expressPlugin(): Plugin {
 
       // Attach Socket.io to Vite's HTTP server
       if (viteServer.httpServer) {
-        setupSocketIO(viteServer.httpServer);
+        setupSocketIO(viteServer.httpServer as any);
         console.log("✅ Socket.io attached to Vite dev server");
       }
 
