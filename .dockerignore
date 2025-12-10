@@ -35,7 +35,8 @@ data
 .env
 load-ids.txt
 
-server
+# Don't ignore server folder - we need it for build
+# server
 tmp
 types
 .git
