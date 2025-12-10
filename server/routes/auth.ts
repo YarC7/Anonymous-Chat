@@ -242,6 +242,7 @@ export const handleUpdateProfile: RequestHandler = async (req, res) => {
       .update({
         gender: preferences.gender,
         chat_style: preferences.chatStyle,
+        match_gender: preferences.matchGender || "random",
         interests: preferences.interests
           ? JSON.stringify(preferences.interests)
           : null,
@@ -252,6 +253,7 @@ export const handleUpdateProfile: RequestHandler = async (req, res) => {
       user_id: user.id,
       gender: preferences.gender,
       chat_style: preferences.chatStyle,
+      match_gender: preferences.matchGender || "random",
       interests: preferences.interests
         ? JSON.stringify(preferences.interests)
         : null,

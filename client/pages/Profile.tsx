@@ -21,6 +21,7 @@ export default function Profile() {
   const [preferences, setPreferences] = useState<UserPreferences>({
     gender: undefined,
     chatStyle: undefined,
+    matchGender: "random",
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -99,6 +100,47 @@ export default function Profile() {
                     className="font-normal cursor-pointer"
                   >
                     Prefer not to say
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
+
+            {/* Match Preference Selection */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">
+                Who do you want to chat with?
+              </Label>
+              <RadioGroup
+                value={preferences.matchGender}
+                onValueChange={(value) =>
+                  setPreferences({ ...preferences, matchGender: value as any })
+                }
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="male" id="match-male" />
+                  <Label
+                    htmlFor="match-male"
+                    className="font-normal cursor-pointer"
+                  >
+                    Male
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="female" id="match-female" />
+                  <Label
+                    htmlFor="match-female"
+                    className="font-normal cursor-pointer"
+                  >
+                    Female
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="random" id="match-random" />
+                  <Label
+                    htmlFor="match-random"
+                    className="font-normal cursor-pointer"
+                  >
+                    Random (Any gender)
                   </Label>
                 </div>
               </RadioGroup>

@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 
 export default function Index() {
   const navigate = useNavigate();
-  const { user, loading, signInWithGoogle } = useAuth();
+  const { user, loading, signInWithGoogle, signOut } = useAuth();
 
   // Redirect to profile if user logged in but profile incomplete
   useEffect(() => {
@@ -39,13 +39,31 @@ export default function Index() {
         </p>
 
         {user ? (
-          <Button
-            onClick={handleStartChat}
-            size="lg"
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6"
-          >
-            START CHAT
-          </Button>
+          <div className="space-y-4">
+            <div className="mb-6 p-4 bg-card border border-border rounded-lg">
+              <p className="text-sm text-muted-foreground mb-1">Continue as</p>
+              <p className="text-lg font-semibold text-foreground">
+                {user.name}
+              </p>
+            </div>
+
+            <Button
+              onClick={handleStartChat}
+              size="lg"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6"
+            >
+              START CHAT
+            </Button>
+
+            <Button
+              onClick={signOut}
+              variant="outline"
+              size="lg"
+              className="w-full text-muted-foreground hover:text-foreground"
+            >
+              Continue as other user
+            </Button>
+          </div>
         ) : (
           <Button
             onClick={signInWithGoogle}

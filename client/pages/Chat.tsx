@@ -26,6 +26,15 @@ export default function Chat() {
   const [icebreakers, setIcebreakers] = useState<string[]>([]);
   const [strangerTyping, setStrangerTyping] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [refreshingIcebreakers, setRefreshingIcebreakers] = useState(false);
+  const [strangerLeft, setStrangerLeft] = useState(false);
+  const [strangerDisconnected, setStrangerDisconnected] = useState(false);
+  const [queueStats, setQueueStats] = useState<{
+    position: number;
+    totalInQueue: number;
+    maleCount: number;
+    femaleCount: number;
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -57,17 +66,44 @@ export default function Chat() {
       setIsConnected(false);
     });
 
-    newSocket.on("searching", (data: { queuePosition: number }) => {
-      console.log("Still searching, queue position:", data.queuePosition);
-    });
+    newSocket.on(
+      "searching",
+      (data: {
+        queuePosition: number;
+        totalInQueue: number;
+        maleCount: number;
+        femaleCount: number;
+      }) => {
+        console.log("Still searching, queue stats:", data);
+        setQueueStats({
+          position: data.queuePosition,
+          totalInQueue: data.totalInQueue,
+          maleCount: data.maleCount,
+          femaleCount: data.femaleCount,
+        });
+      },
+    );
 
     newSocket.on(
       "match_found",
-      (data: { sessionId: string; icebreakers: string[] }) => {
+      (data: {
+        sessionId: string;
+        icebreakers: string[];
+        messages?: Message[];
+      }) => {
         console.log("Match found!", data);
         setIsSearching(false);
+        setStrangerLeft(false);
+        setStrangerDisconnected(false);
+        setQueueStats(null);
         setSessionId(data.sessionId);
         setIcebreakers(data.icebreakers || []);
+
+        // Restore previous messages if reconnecting
+        if (data.messages && data.messages.length > 0) {
+          console.log(`Restoring ${data.messages.length} previous messages`);
+          setMessages(data.messages);
+        }
 
         // Join the session room
         newSocket.emit("join_session", { sessionId: data.sessionId });
@@ -83,25 +119,49 @@ export default function Chat() {
       setStrangerTyping(data.isTyping);
     });
 
-    newSocket.on("stranger_left", () => {
-      alert("Stranger left the chat. Finding you a new match...");
-      // Reset state
-      setMessages([]);
-      setSessionId(null);
-      setIcebreakers([]);
-      setIsSearching(true);
+    newSocket.on("new_icebreakers", (data: { icebreakers: string[] }) => {
+      console.log("New icebreakers received:", data.icebreakers);
+      setIcebreakers(data.icebreakers);
+      setRefreshingIcebreakers(false);
+    });
 
-      // Rejoin queue
-      newSocket.emit("join_queue", { userId: user.id });
+    newSocket.on("stranger_left", () => {
+      console.log("=== STRANGER LEFT EVENT RECEIVED ===");
+      setStrangerLeft(true);
+      // Show a brief message before finding new match
+      setTimeout(() => {
+        // Reset state
+        setMessages([]);
+        setSessionId(null);
+        setIcebreakers([]);
+        setStrangerLeft(false);
+        setIsSearching(true);
+
+        // Rejoin queue
+        newSocket.emit("join_queue", { userId: user.id });
+      }, 2000); // 2 second delay to show message
     });
 
     newSocket.on("stranger_disconnected", () => {
-      alert("Stranger disconnected. Finding you a new match...");
+      // Show a temporary message, don't reset the chat
+      // User might reconnect (refresh page, network issue, etc.)
+      console.log("Stranger temporarily disconnected");
+      setStrangerDisconnected(true);
+      setStrangerTyping(false);
+    });
+
+    newSocket.on("stranger_reconnected", () => {
+      console.log("Stranger reconnected!");
+      setStrangerDisconnected(false);
+    });
+
+    newSocket.on("session_left", () => {
+      console.log("Session left confirmation received");
+      // Now we can safely rejoin queue
       setMessages([]);
       setSessionId(null);
       setIcebreakers([]);
       setIsSearching(true);
-
       newSocket.emit("join_queue", { userId: user.id });
     });
 
@@ -119,6 +179,16 @@ export default function Chat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log("=== STATE UPDATE ===", {
+      sessionId,
+      isSearching,
+      hasSocket: !!socket,
+      messageCount: messages.length,
+    });
+  }, [sessionId, isSearching, socket, messages.length]);
 
   const handleSend = (messageText?: string) => {
     const text = messageText || inputValue.trim();
@@ -158,18 +228,24 @@ export default function Chat() {
   };
 
   const handleSkip = () => {
+    console.log("=== SKIP BUTTON CLICKED ===");
     if (!socket) return;
 
+    console.log("Emitting leave_session event");
+    // Just emit leave_session, the rest will be handled by session_left listener
     socket.emit("leave_session");
-    setMessages([]);
-    setSessionId(null);
-    setIcebreakers([]);
-    setIsSearching(true);
+  };
 
-    // Find new match
-    if (user) {
-      socket.emit("join_queue", { userId: user.id });
+  const handleRefreshIcebreakers = () => {
+    if (!socket || !sessionId || refreshingIcebreakers) return;
+
+    if (messages.length < 3) {
+      alert("Have a few more messages before refreshing icebreakers!");
+      return;
     }
+
+    setRefreshingIcebreakers(true);
+    socket.emit("request_new_icebreakers", { sessionId });
   };
 
   if (!isConnected) {
@@ -185,13 +261,59 @@ export default function Chat() {
 
   if (isSearching) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50">
-        <Card className="p-8 text-center max-w-md">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 p-4">
+        <Card className="p-8 text-center max-w-md w-full">
           <Loader2 className="w-16 h-16 animate-spin mx-auto mb-4 text-blue-600" />
           <h2 className="text-2xl font-bold mb-2">Finding you a match...</h2>
-          <p className="text-gray-600">
+          <p className="text-gray-600 mb-6">
             Looking for someone interesting to chat with 🔍
           </p>
+
+          {queueStats && queueStats.totalInQueue > 1 && (
+            <div className="mt-6 space-y-3">
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                <div className="text-sm text-muted-foreground mb-2">
+                  Queue Position
+                </div>
+                <div className="text-3xl font-bold text-blue-600">
+                  #{queueStats.position}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <div className="bg-muted rounded-lg p-3">
+                  <div className="text-muted-foreground text-xs mb-1">
+                    Total
+                  </div>
+                  <div className="font-semibold text-lg">
+                    {queueStats.totalInQueue}
+                  </div>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+                  <div className="text-muted-foreground text-xs mb-1">
+                    👨 Male
+                  </div>
+                  <div className="font-semibold text-lg">
+                    {queueStats.maleCount}
+                  </div>
+                </div>
+                <div className="bg-pink-50 dark:bg-pink-900/20 rounded-lg p-3">
+                  <div className="text-muted-foreground text-xs mb-1">
+                    👩 Female
+                  </div>
+                  <div className="font-semibold text-lg">
+                    {queueStats.femaleCount}
+                  </div>
+                </div>
+              </div>
+
+              {queueStats.totalInQueue > 100 && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+                  ⚠️ High traffic! Finding the best match for you...
+                </p>
+              )}
+            </div>
+          )}
         </Card>
       </div>
     );
@@ -262,9 +384,30 @@ export default function Chat() {
       {/* Icebreaker Pills */}
       {icebreakers.length > 0 && (
         <div className="px-4 py-4 border-t border-border space-y-2 bg-card/50">
-          <p className="text-xs font-medium text-muted-foreground mb-3">
-            💡 AI-powered conversation starters:
-          </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              💡 AI-powered conversation starters:
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefreshIcebreakers}
+              disabled={refreshingIcebreakers || messages.length < 3}
+              className="text-xs"
+            >
+              {refreshingIcebreakers ? (
+                <>
+                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <ArrowRight className="w-3 h-3 mr-1" />
+                  Refresh Ideas
+                </>
+              )}
+            </Button>
+          </div>
           <div className="flex flex-wrap gap-2">
             {icebreakers.map((suggestion, index) => (
               <Button
@@ -283,6 +426,16 @@ export default function Chat() {
 
       {/* Input Area */}
       <div className="border-t border-border px-4 py-4 bg-card/50">
+        {strangerLeft && (
+          <div className="text-center py-2 px-3 text-sm text-muted-foreground bg-muted rounded-md mb-3">
+            ⚠️ Stranger has left the chat. Finding you a new match...
+          </div>
+        )}
+        {strangerDisconnected && !strangerLeft && (
+          <div className="text-center py-2 px-3 text-sm text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-md mb-3">
+            ⚠️ Stranger disconnected. They might reconnect soon...
+          </div>
+        )}
         <div className="flex gap-2 mb-3">
           <Input
             type="text"
@@ -294,19 +447,27 @@ export default function Chat() {
                 handleSend();
               }
             }}
-            placeholder="Type your message..."
+            placeholder={
+              strangerLeft ? "Stranger has left..." : "Type your message..."
+            }
             className="flex-1"
+            disabled={strangerLeft}
           />
           <Button
             onClick={() => handleSend()}
-            disabled={!inputValue.trim()}
+            disabled={!inputValue.trim() || strangerLeft}
             size="icon"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
-        <Button onClick={handleSkip} variant="outline" className="w-full">
-          Skip & Find New Match
+        <Button
+          onClick={handleSkip}
+          variant="outline"
+          className="w-full"
+          disabled={strangerLeft}
+        >
+          {strangerLeft ? "Finding New Match..." : "Skip & Find New Match"}
         </Button>
       </div>
     </div>

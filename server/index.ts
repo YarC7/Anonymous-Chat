@@ -12,12 +12,15 @@ import {
 } from "./routes/auth";
 import { setupSocketIO } from "./socket";
 
-export function createServer() {
+export function createServer(attachSocketIO = true) {
   const app = express();
   const httpServer = createHttpServer(app);
 
-  // Setup Socket.IO
-  const io = setupSocketIO(httpServer);
+  // Setup Socket.IO (only in production, dev mode handles it separately)
+  let io;
+  if (attachSocketIO) {
+    io = setupSocketIO(httpServer);
+  }
 
   // Middleware
   app.use(
@@ -44,5 +47,5 @@ export function createServer() {
 
   app.get("/api/demo", handleDemo);
 
-  return httpServer;
+  return { app, httpServer, io };
 }

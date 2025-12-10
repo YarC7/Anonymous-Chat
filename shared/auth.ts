@@ -10,6 +10,7 @@ export interface User {
 export interface UserPreferences {
   gender?: "male" | "female" | "other" | "prefer-not-to-say";
   chatStyle?: "friendly" | "casual" | "professional" | "fun";
+  matchGender?: "male" | "female" | "random";
   interests?: string[];
 }
 
